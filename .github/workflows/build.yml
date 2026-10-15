@@ -1,0 +1,23 @@
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-android:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Build APK
+        uses: n8marti/buildozer-action@fix-user-doesnt-exist
+        id: buildozer
+        with:
+          workdir: .
+          buildozer_version: stable
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: package
+          path: ${{ steps.buildozer.outputs.filename }}

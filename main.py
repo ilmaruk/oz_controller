@@ -4,6 +4,8 @@ from kivy.graphics import Color, Line, Rectangle
 from kivy.metrics import dp
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
+from kivy.uix.label import Label
+from kivy.uix.popup import Popup
 from kivy.uix.textinput import TextInput
 
 
@@ -69,8 +71,11 @@ class PhoneLayoutApp(App):
             size_hint_y=1,
         )
         self.style_quadrant(bottom_quadrant, (0.87, 0.91, 0.94, 1))
+        self.timer_is_set = False
+        self.timer_is_running = False
         self.timer_input = TextInput(
             text="600",
+            input_filter="int",
             multiline=False,
             font_size="22sp",
             halign="center",
@@ -78,11 +83,22 @@ class PhoneLayoutApp(App):
             height=dp(54),
             padding=[dp(10), dp(10)],
         )
+        self.timer_input.bind(text=self.on_timer_input_change)
         bottom_quadrant.add_widget(self.timer_input)
-        bottom_quadrant.add_widget(self.make_button_row((("SET", None),)))
-        bottom_quadrant.add_widget(
-            self.make_button_row((("START", None), ("STOP", None)))
+        set_row = self.make_button_row((("SET", self.on_set_timer),))
+        self.set_button = set_row.children[0]
+        bottom_quadrant.add_widget(set_row)
+        start_stop_row = self.make_button_row(
+            (("START", self.on_start_timer), ("STOP", self.on_stop_timer))
         )
+        self.start_button = next(
+            button for button in start_stop_row.children if button.text == "START"
+        )
+        self.stop_button = next(
+            button for button in start_stop_row.children if button.text == "STOP"
+        )
+        bottom_quadrant.add_widget(start_stop_row)
+        self.update_timer_controls()
 
         root.add_widget(top_quadrant)
         root.add_widget(bottom_quadrant)
@@ -166,8 +182,96 @@ class PhoneLayoutApp(App):
         self.adjust_value(self.text_area_2, -1)
 
     def on_button_5(self, *_):
+        self.show_confirmation(
+            "Sei sicuro di volere resettare il punteggio?",
+            self.reset_score,
+        )
+
+    def reset_score(self):
         self.text_area_1.text = "0"
         self.text_area_2.text = "0"
+
+    def show_confirmation(self, message, on_confirm):
+        content = BoxLayout(
+            orientation="vertical",
+            spacing=dp(12),
+            padding=dp(12),
+        )
+        prompt = Label(
+            text=message,
+            halign="center",
+            valign="middle",
+        )
+        prompt.bind(size=lambda widget, size: setattr(widget, "text_size", size))
+        content.add_widget(prompt)
+
+        actions = BoxLayout(
+            orientation="horizontal",
+            size_hint_y=None,
+            height=dp(54),
+            spacing=dp(10),
+        )
+        cancel_button = Button(text="ANNULLA")
+        confirm_button = Button(text="CONFERMA")
+        actions.add_widget(cancel_button)
+        actions.add_widget(confirm_button)
+        content.add_widget(actions)
+
+        popup = Popup(
+            title="Conferma",
+            content=content,
+            size_hint=(0.85, None),
+            height=dp(220),
+            auto_dismiss=False,
+        )
+        cancel_button.bind(on_release=popup.dismiss)
+
+        def confirm_action(*_):
+            on_confirm()
+            popup.dismiss()
+
+        confirm_button.bind(on_release=confirm_action)
+        self.confirmation_popup = popup
+        popup.open()
+
+    def on_timer_input_change(self, *_):
+        if not self.timer_is_running:
+            self.timer_is_set = False
+        self.update_timer_controls()
+
+    def on_set_timer(self, *_):
+        if not self.is_valid_timer_value():
+            return
+        self.show_confirmation(
+            "Sei sicuro di volere resettare l'orologio?",
+            self.confirm_set_timer,
+        )
+
+    def confirm_set_timer(self):
+        if self.is_valid_timer_value():
+            self.timer_is_set = True
+        self.update_timer_controls()
+
+    def on_start_timer(self, *_):
+        if self.timer_is_set and not self.timer_is_running:
+            self.timer_is_running = True
+        self.update_timer_controls()
+
+    def on_stop_timer(self, *_):
+        if self.timer_is_running:
+            self.timer_is_running = False
+        self.update_timer_controls()
+
+    def is_valid_timer_value(self):
+        try:
+            return int(self.timer_input.text) > 0
+        except ValueError:
+            return False
+
+    def update_timer_controls(self):
+        self.set_button.disabled = self.timer_is_running or not self.is_valid_timer_value()
+        self.start_button.disabled = self.timer_is_running or not self.timer_is_set
+        self.stop_button.disabled = not self.timer_is_running
 
 
 if __name__ == "__main__":
