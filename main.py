@@ -1,6 +1,10 @@
+import json
+
+import paho.mqtt.client as mqtt
 from kivy.app import App
 from kivy.core.window import Window
 from kivy.graphics import Color, Line, Rectangle
+from kivy.logger import Logger
 from kivy.metrics import dp
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
@@ -12,6 +16,11 @@ from kivy.uix.textinput import TextInput
 # Portrait phone-like preview when running on a desktop.
 # On Android, Kivy uses the device's actual screen dimensions.
 Window.size = (390, 844)
+
+MQTT_BROKER = "broker.hivemq.com"
+MQTT_PORT = 1883
+MQTT_TOPIC = "oz/clock"
+MQTT_CLIENT_ID = "oz-app"
 
 
 class PhoneLayoutApp(App):
@@ -104,6 +113,39 @@ class PhoneLayoutApp(App):
         root.add_widget(bottom_quadrant)
 
         return root
+
+    def on_start(self):
+        self.mqtt_client = mqtt.Client(
+            callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
+            client_id=MQTT_CLIENT_ID,
+        )
+        self.mqtt_client.on_connect = self.on_mqtt_connect
+        self.mqtt_client.reconnect_delay_set(min_delay=1, max_delay=30)
+        self.mqtt_client.connect_async(MQTT_BROKER, MQTT_PORT, keepalive=60)
+        self.mqtt_client.loop_start()
+
+    def on_stop(self):
+        if hasattr(self, "mqtt_client"):
+            self.mqtt_client.disconnect()
+            self.mqtt_client.loop_stop()
+
+    def on_mqtt_connect(self, _client, _userdata, _flags, reason_code, _properties):
+        if reason_code.is_failure:
+            Logger.warning("MQTT: connection failed: %s" % reason_code)
+            return
+        Logger.info("MQTT: connected to %s" % MQTT_BROKER)
+
+    def publish_mqtt_command(self, command, duration=None):
+        client = getattr(self, "mqtt_client", None)
+        if client is None:
+            return
+        message = {"command": command}
+        if duration is not None:
+            message["duration"] = duration
+        payload = json.dumps(message)
+        result = client.publish(MQTT_TOPIC, payload)
+        if result.rc != mqtt.MQTT_ERR_SUCCESS:
+            Logger.warning("MQTT: publish failed with code %s" % result.rc)
 
     def style_quadrant(self, quadrant, background_color):
         with quadrant.canvas.before:
@@ -250,16 +292,19 @@ class PhoneLayoutApp(App):
     def confirm_set_timer(self):
         if self.is_valid_timer_value():
             self.timer_is_set = True
+            self.publish_mqtt_command("SET", int(self.timer_input.text))
         self.update_timer_controls()
 
     def on_start_timer(self, *_):
         if self.timer_is_set and not self.timer_is_running:
             self.timer_is_running = True
+            self.publish_mqtt_command("START")
         self.update_timer_controls()
 
     def on_stop_timer(self, *_):
         if self.timer_is_running:
             self.timer_is_running = False
+            self.publish_mqtt_command("STOP")
         self.update_timer_controls()
 
     def is_valid_timer_value(self):
