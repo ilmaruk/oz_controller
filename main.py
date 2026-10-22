@@ -90,12 +90,16 @@ class PhoneLayoutApp(App):
         first_text_row.add_widget(self.home_score)
         first_text_row.add_widget(self.away_score)
         top_quadrant.add_widget(first_text_row)
-        top_quadrant.add_widget(
-            self.make_button_row((("+", self.on_button_1), ("+", self.on_button_2)))
+        increment_row = self.make_button_row(
+            (("+", self.on_button_1), ("+", self.on_button_2))
         )
-        top_quadrant.add_widget(
-            self.make_button_row((("-", self.on_button_3), ("-", self.on_button_4)))
+        decrement_row = self.make_button_row(
+            (("-", self.on_button_3), ("-", self.on_button_4))
         )
+        self.score_buttons = list(reversed(increment_row.children))
+        self.score_buttons.extend(reversed(decrement_row.children))
+        top_quadrant.add_widget(increment_row)
+        top_quadrant.add_widget(decrement_row)
         top_quadrant.add_widget(self.make_button_row((("RESET", self.on_button_5),)))
 
         bottom_quadrant = BoxLayout(
@@ -359,6 +363,8 @@ class PhoneLayoutApp(App):
             return False
 
     def update_timer_controls(self):
+        for button in self.score_buttons:
+            button.disabled = not self.timer_is_running
         self.set_button.disabled = self.timer_is_running or not self.is_valid_timer_value()
         self.start_button.disabled = self.timer_is_running or not self.timer_is_set
         self.stop_button.disabled = not self.timer_is_running
