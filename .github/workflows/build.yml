@@ -10,14 +10,15 @@ jobs:
         uses: actions/checkout@v4
         
       - name: Build APK
-        uses: n8marti/buildozer-action@fix-user-doesnt-exist
-        id: buildozer
-        with:
-          workdir: .
-          buildozer_version: stable
+        run: >-
+          docker run --rm
+          -v "${GITHUB_WORKSPACE}:/home/user/hostcwd"
+          -v "${GITHUB_WORKSPACE}/.buildozer_global:/home/user/.buildozer"
+          ghcr.io/kivy/buildozer:latest
+          android debug
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: package
-          path: ${{ steps.buildozer.outputs.filename }}
+          path: bin/*.apk
