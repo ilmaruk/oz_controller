@@ -177,9 +177,7 @@ class PhoneLayoutApp(App):
         if duration is not None:
             message["duration"] = duration
         payload = json.dumps(message)
-        result = client.publish(MQTT_CLOCK_TOPIC, payload)
-        if result.rc != mqtt.MQTT_ERR_SUCCESS:
-            Logger.warning("MQTT: publish failed with code %s" % result.rc)
+        self.publish_mqtt_message(client, MQTT_CLOCK_TOPIC, payload)
 
     def publish_mqtt_score(self):
         client = getattr(self, "mqtt_client", None)
@@ -187,15 +185,21 @@ class PhoneLayoutApp(App):
             return
         payload = json.dumps(
             {
-                "home_id": self.home_id.text,
-                "away_id": self.away_id.text,
+                "home_id": self.home_id.text.upper(),
+                "away_id": self.away_id.text.upper(),
                 "home_score": int(self.home_score.text),
                 "away_score": int(self.away_score.text),
             }
         )
-        result = client.publish(MQTT_SCORE_TOPIC, payload)
+        self.publish_mqtt_message(client, MQTT_SCORE_TOPIC, payload)
+
+    @staticmethod
+    def publish_mqtt_message(client, topic, payload):
+        result = client.publish(topic, payload)
         if result.rc != mqtt.MQTT_ERR_SUCCESS:
             Logger.warning("MQTT: publish failed with code %s" % result.rc)
+        else:
+            Logger.info("MQTT: published to %s: %s" % (topic, payload))
 
     def style_quadrant(self, quadrant, background_color):
         with quadrant.canvas.before:
@@ -286,6 +290,7 @@ class PhoneLayoutApp(App):
     def reset_score(self):
         self.home_score.text = "0"
         self.away_score.text = "0"
+        self.publish_mqtt_score()
 
     def show_confirmation(self, message, on_confirm):
         content = BoxLayout(
