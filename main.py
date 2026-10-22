@@ -19,7 +19,8 @@ Window.size = (390, 844)
 
 MQTT_BROKER = "broker.hivemq.com"
 MQTT_PORT = 1883
-MQTT_TOPIC = "oz/clock"
+MQTT_CLOCK_TOPIC = "oz/allinone"
+MQTT_SCORE_TOPIC = "oz/allinone"
 MQTT_CLIENT_ID = "oz-app"
 
 
@@ -38,32 +39,56 @@ class PhoneLayoutApp(App):
             size_hint_y=1,
         )
         self.style_quadrant(top_quadrant, (0.95, 0.97, 0.98, 1))
+        id_text_row = BoxLayout(
+            orientation="horizontal",
+            size_hint_y=None,
+            height=dp(54),
+            spacing=dp(8),
+        )
+        self.home_id = TextInput(
+            text="Home",
+            multiline=False,
+            font_size="22sp",
+            halign="center",
+            padding=[dp(10), dp(10)],
+        )
+        self.away_id = TextInput(
+            text="Away",
+            multiline=False,
+            font_size="22sp",
+            halign="center",
+            padding=[dp(10), dp(10)],
+        )
+        id_text_row.add_widget(self.home_id)
+        id_text_row.add_widget(self.away_id)
+        top_quadrant.add_widget(id_text_row)
+
         first_text_row = BoxLayout(
             orientation="horizontal",
             size_hint_y=None,
             height=dp(54),
             spacing=dp(8),
         )
-        self.text_area_1 = TextInput(
+        self.home_score = TextInput(
             text="0",
-            hint_text="First text area",
+            hint_text="Home score",
             input_filter="int",
             multiline=False,
             font_size="22sp",
             halign="center",
             padding=[dp(10), dp(10)],
         )
-        self.text_area_2 = TextInput(
+        self.away_score = TextInput(
             text="0",
-            hint_text="Second text area",
+            hint_text="Away score",
             input_filter="int",
             multiline=False,
             font_size="22sp",
             halign="center",
             padding=[dp(10), dp(10)],
         )
-        first_text_row.add_widget(self.text_area_1)
-        first_text_row.add_widget(self.text_area_2)
+        first_text_row.add_widget(self.home_score)
+        first_text_row.add_widget(self.away_score)
         top_quadrant.add_widget(first_text_row)
         top_quadrant.add_widget(
             self.make_button_row((("+", self.on_button_1), ("+", self.on_button_2)))
@@ -143,7 +168,23 @@ class PhoneLayoutApp(App):
         if duration is not None:
             message["duration"] = duration
         payload = json.dumps(message)
-        result = client.publish(MQTT_TOPIC, payload)
+        result = client.publish(MQTT_CLOCK_TOPIC, payload)
+        if result.rc != mqtt.MQTT_ERR_SUCCESS:
+            Logger.warning("MQTT: publish failed with code %s" % result.rc)
+
+    def publish_mqtt_score(self):
+        client = getattr(self, "mqtt_client", None)
+        if client is None:
+            return
+        payload = json.dumps(
+            {
+                "home_id": self.home_id.text,
+                "away_id": self.away_id.text,
+                "home_score": int(self.home_score.text),
+                "away_score": int(self.away_score.text),
+            }
+        )
+        result = client.publish(MQTT_SCORE_TOPIC, payload)
         if result.rc != mqtt.MQTT_ERR_SUCCESS:
             Logger.warning("MQTT: publish failed with code %s" % result.rc)
 
@@ -212,16 +253,20 @@ class PhoneLayoutApp(App):
         text_input.text = str(max(0, value + delta))
 
     def on_button_1(self, *_):
-        self.adjust_value(self.text_area_1, 1)
+        self.adjust_value(self.home_score, 1)
+        self.publish_mqtt_score()
 
     def on_button_2(self, *_):
-        self.adjust_value(self.text_area_2, 1)
+        self.adjust_value(self.away_score, 1)
+        self.publish_mqtt_score()
 
     def on_button_3(self, *_):
-        self.adjust_value(self.text_area_1, -1)
+        self.adjust_value(self.home_score, -1)
+        self.publish_mqtt_score()
 
     def on_button_4(self, *_):
-        self.adjust_value(self.text_area_2, -1)
+        self.adjust_value(self.away_score, -1)
+        self.publish_mqtt_score()
 
     def on_button_5(self, *_):
         self.show_confirmation(
@@ -230,8 +275,8 @@ class PhoneLayoutApp(App):
         )
 
     def reset_score(self):
-        self.text_area_1.text = "0"
-        self.text_area_2.text = "0"
+        self.home_score.text = "0"
+        self.away_score.text = "0"
 
     def show_confirmation(self, message, on_confirm):
         content = BoxLayout(
