@@ -140,8 +140,13 @@ class PhoneLayoutApp(App):
 
         root.add_widget(top_quadrant)
         root.add_widget(bottom_quadrant)
+        root.bind(size=self.update_root_orientation)
 
         return root
+
+    @staticmethod
+    def update_root_orientation(root, size):
+        root.orientation = "horizontal" if size[0] > size[1] else "vertical"
 
     def on_start(self):
         self.mqtt_client = mqtt.Client(
