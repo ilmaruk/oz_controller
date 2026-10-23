@@ -178,6 +178,7 @@ class PhoneLayoutApp(App):
             message["duration"] = duration
         payload = json.dumps(message)
         self.publish_mqtt_message(client, MQTT_CLOCK_TOPIC, payload)
+        self.publish_mqtt_score()
 
     def publish_mqtt_score(self):
         client = getattr(self, "mqtt_client", None)
@@ -199,7 +200,7 @@ class PhoneLayoutApp(App):
         if result.rc != mqtt.MQTT_ERR_SUCCESS:
             Logger.warning("MQTT: publish failed with code %s" % result.rc)
         else:
-            Logger.info("MQTT: published to %s: %s" % (topic, payload))
+            Logger.debug("MQTT: published to %s: %s" % (topic, payload))
 
     def style_quadrant(self, quadrant, background_color):
         with quadrant.canvas.before:
