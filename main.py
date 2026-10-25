@@ -13,11 +13,13 @@ from kivy.uix.button import Button
 from kivy.uix.label import Label
 from kivy.uix.popup import Popup
 from kivy.uix.textinput import TextInput
+from kivy.utils import platform
 
 
 # Portrait phone-like preview when running on a desktop.
 # On Android, Kivy uses the device's actual screen dimensions.
-Window.size = (390, 844)
+if platform != "android":
+    Window.size = (390, 844)
 
 MQTT_CONFIG = configparser.ConfigParser()
 MQTT_CONFIG.read(Path(__file__).resolve().with_name("config.ini"))
