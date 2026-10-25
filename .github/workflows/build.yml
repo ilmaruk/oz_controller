@@ -59,6 +59,12 @@ jobs:
           rm -rf .buildozer
           buildozer android clean || true
 
+      - name: Create config.ini
+        env:
+          CONFIG_INI: ${{ secrets.CONFIG_INI }}
+        run: |
+          printf '%s\n' "$CONFIG_INI" > config.ini
+          
       - name: Build APK
         run: |
           buildozer -v android debug
