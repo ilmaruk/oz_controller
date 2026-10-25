@@ -1,4 +1,6 @@
+import configparser
 import json
+from pathlib import Path
 
 import paho.mqtt.client as mqtt
 from kivy.app import App
@@ -17,11 +19,13 @@ from kivy.uix.textinput import TextInput
 # On Android, Kivy uses the device's actual screen dimensions.
 Window.size = (390, 844)
 
-MQTT_BROKER = "broker.hivemq.com"
-MQTT_PORT = 1883
-MQTT_CLOCK_TOPIC = "oz/allinone"
-MQTT_SCORE_TOPIC = "oz/allinone"
-MQTT_CLIENT_ID = "oz-app"
+MQTT_CONFIG = configparser.ConfigParser()
+MQTT_CONFIG.read(Path(__file__).resolve().with_name("config.ini"))
+MQTT_BROKER = MQTT_CONFIG.get("mqtt", "broker")
+MQTT_PORT = MQTT_CONFIG.getint("mqtt", "port")
+MQTT_CLOCK_TOPIC = MQTT_CONFIG.get("mqtt", "clock_topic")
+MQTT_SCORE_TOPIC = MQTT_CONFIG.get("mqtt", "score_topic")
+MQTT_CLIENT_ID = MQTT_CONFIG.get("mqtt", "client_id")
 
 
 class PhoneLayoutApp(App):
