@@ -58,10 +58,10 @@ jobs:
           java -version
           buildozer --version
 
-      - name: Clean previous build
-        run: |
-          buildozer android clean
-          rm -rf .buildozer/android/platform/build-*/build/venv
+      # - name: Clean previous build
+      #   run: |
+      #     buildozer android clean
+      #     rm -rf .buildozer/android/platform/build-*/build/venv
 
       - name: Build APK
         run: |
