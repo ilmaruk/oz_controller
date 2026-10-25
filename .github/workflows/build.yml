@@ -2,7 +2,7 @@ name: Build Kivy Android APK
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
   workflow_dispatch:
 
@@ -64,7 +64,7 @@ jobs:
           CONFIG_INI: ${{ secrets.CONFIG_INI }}
         run: |
           printf '%s\n' "$CONFIG_INI" > config.ini
-          
+
       - name: Build APK
         run: |
           buildozer -v android debug
