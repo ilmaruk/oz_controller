@@ -12,6 +12,7 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
 from kivy.uix.label import Label
 from kivy.uix.popup import Popup
+from kivy.uix.spinner import Spinner
 from kivy.uix.textinput import TextInput
 from kivy.utils import platform
 
@@ -28,6 +29,25 @@ MQTT_PORT = MQTT_CONFIG.getint("mqtt", "port")
 MQTT_CLOCK_TOPIC = MQTT_CONFIG.get("mqtt", "clock_topic")
 MQTT_SCORE_TOPIC = MQTT_CONFIG.get("mqtt", "score_topic")
 MQTT_CLIENT_ID = MQTT_CONFIG.get("mqtt", "client_id")
+TEAM_IDS = {
+    "Ajax": "A",
+    "Ajax (inv)": "a",
+    "Boca": "B",
+    "Boca (inv)": "b",
+    "Celtic": "C",
+    "Celtic (inv)": "c",
+    "Genoa": "G",
+    "Genoa (inv)": "g",
+    "Inter": "I",
+    "Inter (inv)": "i",
+    "Napoli": "N",
+    "Napoli (inv)": "n",
+    "Parma": "P",
+    "Parma (inv)": "p",
+    "River": "R",
+    "River (inv)": "r",
+}
+TEAM_OPTIONS = tuple(TEAM_IDS)
 
 
 class PhoneLayoutApp(App):
@@ -51,19 +71,17 @@ class PhoneLayoutApp(App):
             height=dp(54),
             spacing=dp(8),
         )
-        self.home_id = TextInput(
-            text="Home",
-            multiline=False,
+        self.home_id = Spinner(
+            text="Ajax",
+            values=TEAM_OPTIONS,
             font_size="22sp",
-            halign="center",
-            padding=[dp(10), dp(10)],
+            size_hint_x=1,
         )
-        self.away_id = TextInput(
-            text="Away",
-            multiline=False,
+        self.away_id = Spinner(
+            text="Boca",
+            values=TEAM_OPTIONS,
             font_size="22sp",
-            halign="center",
-            padding=[dp(10), dp(10)],
+            size_hint_x=1,
         )
         id_text_row.add_widget(self.home_id)
         id_text_row.add_widget(self.away_id)
@@ -192,8 +210,8 @@ class PhoneLayoutApp(App):
             return
         payload = json.dumps(
             {
-                "home_id": self.home_id.text.upper(),
-                "away_id": self.away_id.text.upper(),
+                "home_id": TEAM_IDS[self.home_id.text],
+                "away_id": TEAM_IDS[self.away_id.text],
                 "home_score": int(self.home_score.text),
                 "away_score": int(self.away_score.text),
             }
