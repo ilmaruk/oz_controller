@@ -4,6 +4,7 @@ title = OZ Controller App
 package.name = oz_controller
 package.domain = net.ilmaruk
 icon.filename = assets/icon.png
+presplash.filename = assets/icon.png
 source.dir = .
 source.include_exts = py,png,jpg,kv,atlas,ini,ttf
 source.exclude_dirs = venv, .github, .vscode, .git
