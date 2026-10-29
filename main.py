@@ -4,6 +4,7 @@ from pathlib import Path
 
 import paho.mqtt.client as mqtt
 from kivy.app import App
+from kivy.core.image import Image as CoreImage
 from kivy.core.window import Window
 from kivy.graphics import Color, Line, Rectangle
 from kivy.logger import Logger
@@ -12,7 +13,7 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
 from kivy.uix.label import Label
 from kivy.uix.popup import Popup
-from kivy.uix.spinner import Spinner
+from kivy.uix.spinner import Spinner, SpinnerOption
 from kivy.uix.textinput import TextInput
 from kivy.utils import platform
 
@@ -48,6 +49,61 @@ TEAM_IDS = {
     "River (inv)": "r",
 }
 TEAM_OPTIONS = tuple(TEAM_IDS)
+TEAM_ASSET_DIR = Path(__file__).resolve().parent / "assets"
+TEAM_ICONS = {
+    code: CoreImage(
+        str(
+            TEAM_ASSET_DIR
+            / ("inv" if code.islower() else "")
+            / f"crest-{code}.png"
+        )
+    ).texture
+    for code in set(TEAM_IDS.values())
+}
+for texture in TEAM_ICONS.values():
+    texture.mag_filter = "nearest"
+    texture.min_filter = "nearest"
+
+
+class TeamSpinnerOption(SpinnerOption):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.size_hint_y = None
+        self.height = dp(48)
+        self.font_size = "18sp"
+        self.halign = "left"
+        self.padding = (dp(40), dp(8))
+        with self.canvas.after:
+            Color(1, 1, 1, 1)
+            self.icon = Rectangle(
+                texture=TEAM_ICONS[TEAM_IDS[self.text]],
+                size=(dp(24), dp(24)),
+            )
+        self.bind(pos=self.update_icon_position, size=self.update_icon_position)
+        self.update_icon_position()
+
+    def update_icon_position(self, *_):
+        self.icon.pos = (self.x + dp(8), self.y + (self.height - dp(24)) / 2)
+
+
+class TeamSpinner(Spinner):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.halign = "left"
+        self.padding = (dp(40), dp(8))
+        with self.canvas.after:
+            Color(1, 1, 1, 1)
+            self.icon = Rectangle(size=(dp(24), dp(24)))
+        self.bind(text=self.update_icon_texture)
+        self.update_icon_texture(self, self.text)
+        self.bind(pos=self.update_icon_position, size=self.update_icon_position)
+        self.update_icon_position()
+
+    def update_icon_texture(self, _spinner, value):
+        self.icon.texture = TEAM_ICONS[TEAM_IDS[value]]
+
+    def update_icon_position(self, *_):
+        self.icon.pos = (self.x + dp(8), self.y + (self.height - dp(24)) / 2)
 
 
 class PhoneLayoutApp(App):
@@ -71,15 +127,17 @@ class PhoneLayoutApp(App):
             height=dp(54),
             spacing=dp(8),
         )
-        self.home_id = Spinner(
+        self.home_id = TeamSpinner(
             text="Ajax",
             values=TEAM_OPTIONS,
+            option_cls=TeamSpinnerOption,
             font_size="22sp",
             size_hint_x=1,
         )
-        self.away_id = Spinner(
+        self.away_id = TeamSpinner(
             text="Boca",
             values=TEAM_OPTIONS,
+            option_cls=TeamSpinnerOption,
             font_size="22sp",
             size_hint_x=1,
         )
