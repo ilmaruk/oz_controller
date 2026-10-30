@@ -49,6 +49,8 @@ TEAM_IDS = {
     "River (inv)": "r",
 }
 TEAM_OPTIONS = tuple(TEAM_IDS)
+INTENSITY_IDS = {f"Intensity {value}": value for value in range(16)}
+INTENSITY_OPTIONS = tuple(INTENSITY_IDS)
 TEAM_ASSET_DIR = Path(__file__).resolve().parent / "assets"
 TEAM_ICONS = {
     code: CoreImage(
@@ -184,6 +186,10 @@ class PhoneLayoutApp(App):
         top_quadrant.add_widget(decrement_row)
         top_quadrant.add_widget(self.make_button_row((("RESET", self.on_button_5),)))
 
+        bottom_half = BoxLayout(
+            orientation="vertical",
+            size_hint_y=1,
+        )
         bottom_quadrant = BoxLayout(
             orientation="vertical",
             spacing=dp(8),
@@ -220,8 +226,27 @@ class PhoneLayoutApp(App):
         bottom_quadrant.add_widget(start_stop_row)
         self.update_timer_controls()
 
+        intensity_quadrant = BoxLayout(
+            orientation="vertical",
+            padding=dp(8),
+            size_hint_y=None,
+            height=dp(70),
+        )
+        self.style_quadrant(intensity_quadrant, (0.87, 0.91, 0.94, 1))
+        self.intensity_spinner = Spinner(
+            text="Intensity 0",
+            values=INTENSITY_OPTIONS,
+            font_size="22sp",
+            size_hint_y=None,
+            height=dp(54),
+        )
+        self.intensity_spinner.bind(text=self.on_intensity_change)
+        intensity_quadrant.add_widget(self.intensity_spinner)
+
+        bottom_half.add_widget(bottom_quadrant)
+        bottom_half.add_widget(intensity_quadrant)
         root.add_widget(top_quadrant)
-        root.add_widget(bottom_quadrant)
+        root.add_widget(bottom_half)
         root.bind(size=self.update_root_orientation)
 
         return root
@@ -251,16 +276,21 @@ class PhoneLayoutApp(App):
             return
         Logger.info("MQTT: connected to %s" % MQTT_BROKER)
 
-    def publish_mqtt_command(self, command, duration=None):
+    def publish_mqtt_command(self, command, duration=None, intensity=None):
         client = getattr(self, "mqtt_client", None)
         if client is None:
             return
         message = {"command": command}
         if duration is not None:
             message["duration"] = duration
+        if intensity is not None:
+            message["intensity"] = intensity
         payload = json.dumps(message)
         self.publish_mqtt_message(client, MQTT_CLOCK_TOPIC, payload)
         self.publish_mqtt_score()
+
+    def on_intensity_change(self, _spinner, value):
+        self.publish_mqtt_command("INTENSITY", intensity=INTENSITY_IDS[value])
 
     def publish_mqtt_score(self):
         client = getattr(self, "mqtt_client", None)
