@@ -4,6 +4,7 @@ from pathlib import Path
 
 import paho.mqtt.client as mqtt
 from kivy.app import App
+from kivy.clock import Clock
 from kivy.core.image import Image as CoreImage
 from kivy.core.window import Window
 from kivy.graphics import Color, Line, Rectangle
@@ -52,6 +53,7 @@ TEAM_OPTIONS = tuple(TEAM_IDS)
 INTENSITY_IDS = {f"Intensity {value}": value for value in range(16)}
 INTENSITY_OPTIONS = tuple(INTENSITY_IDS)
 TEAM_ASSET_DIR = Path(__file__).resolve().parent / "assets"
+SCORE_BUTTON_COOLDOWN = 0.5
 TEAM_ICONS = {
     code: CoreImage(
         str(
@@ -174,6 +176,7 @@ class PhoneLayoutApp(App):
         first_text_row.add_widget(self.home_score)
         first_text_row.add_widget(self.away_score)
         top_quadrant.add_widget(first_text_row)
+        self.score_buttons_locked = False
         increment_row = self.make_button_row(
             (("+", self.on_button_1), ("+", self.on_button_2))
         )
@@ -340,8 +343,7 @@ class PhoneLayoutApp(App):
             row.add_widget(self.make_button(label, callback))
         return row
 
-    @staticmethod
-    def make_button(label, callback):
+    def make_button(self, label, callback):
         button = Button(text=label, font_size="40sp", size_hint_x=1)
         action_colors = {
             "RESET": (0.78, 0.14, 0.20, 1),
@@ -367,8 +369,27 @@ class PhoneLayoutApp(App):
 
         button.bind(size=fit_label)
         if callback is not None:
-            button.bind(on_release=callback)
+            if label in ("+", "-"):
+
+                def handle_score_button_release(*_):
+                    self.on_score_button_release(button, callback)
+
+                button.bind(on_release=handle_score_button_release)
+            else:
+                button.bind(on_release=callback)
         return button
+
+    def on_score_button_release(self, button, callback):
+        if self.score_buttons_locked:
+            return
+        self.score_buttons_locked = True
+        self.update_timer_controls()
+        Clock.schedule_once(self.unlock_score_buttons, SCORE_BUTTON_COOLDOWN)
+        callback(button)
+
+    def unlock_score_buttons(self, _dt):
+        self.score_buttons_locked = False
+        self.update_timer_controls()
 
     @staticmethod
     def adjust_value(text_input, delta):
@@ -487,7 +508,7 @@ class PhoneLayoutApp(App):
 
     def update_timer_controls(self):
         for button in self.score_buttons:
-            button.disabled = not self.timer_is_running
+            button.disabled = not self.timer_is_running or self.score_buttons_locked
         self.set_button.disabled = self.timer_is_running or not self.is_valid_timer_value()
         self.start_button.disabled = self.timer_is_running or not self.timer_is_set
         self.stop_button.disabled = not self.timer_is_running
