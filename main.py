@@ -110,7 +110,7 @@ class TeamSpinner(Spinner):
         self.icon.pos = (self.x + dp(8), self.y + (self.height - dp(24)) / 2)
 
 
-class PhoneLayoutApp(App):
+class OzControllerApp(App):
     def build(self):
         root = BoxLayout(
             orientation="vertical",
@@ -311,7 +311,7 @@ class PhoneLayoutApp(App):
 
     @staticmethod
     def publish_mqtt_message(client, topic, payload):
-        result = client.publish(topic, payload)
+        result = client.publish(topic, payload, qos=1)
         if result.rc != mqtt.MQTT_ERR_SUCCESS:
             Logger.warning("MQTT: publish failed with code %s" % result.rc)
         else:
@@ -515,4 +515,4 @@ class PhoneLayoutApp(App):
 
 
 if __name__ == "__main__":
-    PhoneLayoutApp().run()
+    OzControllerApp().run()
