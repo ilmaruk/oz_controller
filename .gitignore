@@ -3,3 +3,4 @@ venv/
 *.pyc
 config.ini
 .buildozer/
+crests-creator/

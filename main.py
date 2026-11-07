@@ -32,36 +32,36 @@ MQTT_CLOCK_TOPIC = MQTT_CONFIG.get("mqtt", "clock_topic")
 MQTT_SCORE_TOPIC = MQTT_CONFIG.get("mqtt", "score_topic")
 MQTT_CLIENT_ID = MQTT_CONFIG.get("mqtt", "client_id")
 TEAM_IDS = {
-    "Ajax": "A",
-    "Ajax (inv)": "a",
-    "Boca": "B",
-    "Boca (inv)": "b",
-    "Celtic": "C",
-    "Celtic (inv)": "c",
-    "Genoa": "G",
-    "Genoa (inv)": "g",
-    "Inter": "I",
-    "Inter (inv)": "i",
-    "Napoli": "N",
-    "Napoli (inv)": "n",
-    "Parma": "P",
-    "Parma (inv)": "p",
-    "River": "R",
-    "River (inv)": "r",
+    "Ajax": "a",
+    "Ajax (inv)": "ai",
+    "Boca": "b",
+    "Boca (inv)": "bi",
+    "Celtic": "c",
+    "Celtic (inv)": "ci",
+    "Genoa": "g",
+    "Genoa (inv)": "gi",
+    "Inter": "i",
+    "Inter (inv)": "ii",
+    "Napoli": "n",
+    "Napoli (inv)": "ni",
+    "Parma": "p",
+    "Parma (inv)": "pi",
+    "River": "r",
+    "River (inv)": "ri",
 }
 TEAM_OPTIONS = tuple(TEAM_IDS)
 INTENSITY_IDS = {f"Intensity {value}": value for value in range(16)}
 INTENSITY_OPTIONS = tuple(INTENSITY_IDS)
 TEAM_ASSET_DIR = Path(__file__).resolve().parent / "assets"
 SCORE_BUTTON_COOLDOWN = 0.5
+
+
+def load_team_icon(code):
+    return CoreImage(str(TEAM_ASSET_DIR / f"crest-{code}.png")).texture
+
+
 TEAM_ICONS = {
-    code: CoreImage(
-        str(
-            TEAM_ASSET_DIR
-            / ("inv" if code.islower() else "")
-            / f"crest-{code}.png"
-        )
-    ).texture
+    code: load_team_icon(code)
     for code in set(TEAM_IDS.values())
 }
 for texture in TEAM_ICONS.values():
