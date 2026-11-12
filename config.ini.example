@@ -1,6 +1,7 @@
 [mqtt]
 broker = broker.example.com
 port = 1883
-clock_topic = example/clock
-score_topic = example/score
+topic = example/oz
 client_id = oz-app-example
+username =
+password =

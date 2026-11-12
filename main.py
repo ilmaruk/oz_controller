@@ -24,13 +24,13 @@ from kivy.utils import platform
 if platform != "android":
     Window.size = (390, 844)
 
-MQTT_CONFIG = configparser.ConfigParser()
-MQTT_CONFIG.read(Path(__file__).resolve().with_name("config.ini"))
-MQTT_BROKER = MQTT_CONFIG.get("mqtt", "broker")
-MQTT_PORT = MQTT_CONFIG.getint("mqtt", "port")
-MQTT_CLOCK_TOPIC = MQTT_CONFIG.get("mqtt", "clock_topic")
-MQTT_SCORE_TOPIC = MQTT_CONFIG.get("mqtt", "score_topic")
-MQTT_CLIENT_ID = MQTT_CONFIG.get("mqtt", "client_id")
+MQTT_SETTING_KEYS = (
+    "broker",
+    "port",
+    "topic",
+    "username",
+    "password",
+)
 TEAM_IDS = {
     "Ajax": "a",
     "Ajax (inv)": "ai",
@@ -54,6 +54,75 @@ INTENSITY_IDS = {f"Intensity {value}": value for value in range(16)}
 INTENSITY_OPTIONS = tuple(INTENSITY_IDS)
 TEAM_ASSET_DIR = Path(__file__).resolve().parent / "assets"
 SCORE_BUTTON_COOLDOWN = 0.5
+
+
+def load_default_mqtt_settings():
+    config_dir = Path(__file__).resolve().parent
+    config = configparser.ConfigParser()
+    config.read(
+        [
+            config_dir / "config.ini.example",
+            config_dir / "config.ini",
+        ]
+    )
+    local_config = configparser.ConfigParser()
+    local_config.read(config_dir / "config.ini")
+    if local_config.has_option("mqtt", "topic"):
+        topic = local_config.get("mqtt", "topic")
+    elif local_config.has_option("mqtt", "clock_topic"):
+        topic = local_config.get("mqtt", "clock_topic")
+    else:
+        topic = config.get(
+            "mqtt",
+            "topic",
+            fallback=config.get("mqtt", "clock_topic", fallback=""),
+        )
+    return {
+        "broker": config.get("mqtt", "broker"),
+        "port": config.getint("mqtt", "port"),
+        "topic": topic,
+        "client_id": config.get("mqtt", "client_id", fallback="oz-controller"),
+        "username": config.get("mqtt", "username", fallback=""),
+        "password": config.get("mqtt", "password", fallback=""),
+    }
+
+
+MQTT_CLIENT_ID = load_default_mqtt_settings()["client_id"]
+
+
+def load_mqtt_settings(user_data_dir):
+    settings = load_default_mqtt_settings()
+    settings_path = Path(user_data_dir) / "mqtt_settings.json"
+    if settings_path.exists():
+        saved_settings = json.loads(settings_path.read_text(encoding="utf-8"))
+        if not isinstance(saved_settings, dict):
+            raise ValueError("Saved MQTT settings must be a JSON object")
+        if "topic" not in saved_settings:
+            legacy_topic = saved_settings.get(
+                "clock_topic",
+                saved_settings.get("score_topic"),
+            )
+            if legacy_topic is not None:
+                saved_settings["topic"] = legacy_topic
+        settings.update(
+            {
+                key: saved_settings[key]
+                for key in MQTT_SETTING_KEYS
+                if key in saved_settings
+            }
+        )
+    return settings
+
+
+def save_mqtt_settings(user_data_dir, settings):
+    settings_path = Path(user_data_dir) / "mqtt_settings.json"
+    settings_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path = settings_path.with_name(settings_path.name + ".tmp")
+    temporary_path.write_text(
+        json.dumps({key: settings[key] for key in MQTT_SETTING_KEYS}),
+        encoding="utf-8",
+    )
+    temporary_path.replace(settings_path)
 
 
 def load_team_icon(code):
@@ -123,6 +192,7 @@ class TeamSpinner(Spinner):
 
 class OzControllerApp(App):
     def build(self):
+        self.mqtt_settings = load_mqtt_settings(self.user_data_dir)
         root = BoxLayout(
             orientation="vertical",
             padding=dp(14),
@@ -258,7 +328,20 @@ class OzControllerApp(App):
             height=dp(54),
         )
         self.intensity_spinner.bind(text=self.on_intensity_change)
-        intensity_quadrant.add_widget(self.intensity_spinner)
+        intensity_row = BoxLayout(
+            orientation="horizontal",
+            spacing=dp(8),
+        )
+        intensity_row.add_widget(self.intensity_spinner)
+        self.mqtt_settings_button = Button(
+            text="MQTT",
+            font_size="16sp",
+            size_hint_x=None,
+            width=dp(72),
+        )
+        self.mqtt_settings_button.bind(on_release=self.show_mqtt_settings)
+        intensity_row.add_widget(self.mqtt_settings_button)
+        intensity_quadrant.add_widget(intensity_row)
 
         bottom_half.add_widget(bottom_quadrant)
         bottom_half.add_widget(intensity_quadrant)
@@ -273,13 +356,24 @@ class OzControllerApp(App):
         root.orientation = "horizontal" if size[0] > size[1] else "vertical"
 
     def on_start(self):
+        self.connect_mqtt()
+
+    def connect_mqtt(self):
         self.mqtt_client = mqtt.Client(
             callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
             client_id=MQTT_CLIENT_ID,
         )
         self.mqtt_client.on_connect = self.on_mqtt_connect
         self.mqtt_client.reconnect_delay_set(min_delay=1, max_delay=30)
-        self.mqtt_client.connect_async(MQTT_BROKER, MQTT_PORT, keepalive=60)
+        username = self.mqtt_settings["username"].strip()
+        password = self.mqtt_settings["password"]
+        if username:
+            self.mqtt_client.username_pw_set(username, password)
+        self.mqtt_client.connect_async(
+            self.mqtt_settings["broker"],
+            self.mqtt_settings["port"],
+            keepalive=60,
+        )
         self.mqtt_client.loop_start()
 
     def on_stop(self):
@@ -291,7 +385,7 @@ class OzControllerApp(App):
         if reason_code.is_failure:
             Logger.warning("MQTT: connection failed: %s" % reason_code)
             return
-        Logger.info("MQTT: connected to %s" % MQTT_BROKER)
+        Logger.info("MQTT: connected to %s" % self.mqtt_settings["broker"])
 
     def publish_mqtt_command(self, command, duration=None, intensity=None):
         client = getattr(self, "mqtt_client", None)
@@ -303,7 +397,11 @@ class OzControllerApp(App):
         if intensity is not None:
             message["intensity"] = intensity
         payload = json.dumps(message)
-        self.publish_mqtt_message(client, MQTT_CLOCK_TOPIC, payload)
+        self.publish_mqtt_message(
+            client,
+            self.mqtt_settings["topic"],
+            payload,
+        )
         self.publish_mqtt_score()
 
     def on_intensity_change(self, _spinner, value):
@@ -321,7 +419,11 @@ class OzControllerApp(App):
                 "away_score": int(self.away_score.text),
             }
         )
-        self.publish_mqtt_message(client, MQTT_SCORE_TOPIC, payload)
+        self.publish_mqtt_message(
+            client,
+            self.mqtt_settings["topic"],
+            payload,
+        )
 
     @staticmethod
     def publish_mqtt_message(client, topic, payload):
@@ -486,6 +588,114 @@ class OzControllerApp(App):
 
         confirm_button.bind(on_release=confirm_action)
         self.confirmation_popup = popup
+        popup.open()
+
+    def show_mqtt_settings(self, *_):
+        settings_form = BoxLayout(
+            orientation="vertical",
+            spacing=dp(4),
+            padding=dp(12),
+        )
+        fields = {}
+        field_specs = (
+            ("broker", "Host"),
+            ("port", "Port"),
+            ("topic", "Topic"),
+            ("username", "Username (optional)"),
+            ("password", "Password (optional)"),
+        )
+        for key, label in field_specs:
+            settings_form.add_widget(
+                Label(
+                    text=label,
+                    font_size="14sp",
+                    halign="left",
+                    valign="middle",
+                    size_hint_y=None,
+                    height=dp(20),
+                )
+            )
+            field = TextInput(
+                text=str(self.mqtt_settings[key]),
+                password=(key == "password"),
+                multiline=False,
+                size_hint_y=None,
+                height=dp(40),
+            )
+            fields[key] = field
+            settings_form.add_widget(field)
+
+        error_label = Label(
+            text="",
+            color=(0.8, 0.1, 0.1, 1),
+            size_hint_y=None,
+            height=dp(24),
+        )
+        settings_form.add_widget(error_label)
+        actions = BoxLayout(
+            orientation="horizontal",
+            size_hint_y=None,
+            height=dp(48),
+            spacing=dp(8),
+        )
+        cancel_button = Button(text="Cancel")
+        save_button = Button(text="Save")
+        actions.add_widget(cancel_button)
+        actions.add_widget(save_button)
+        settings_form.add_widget(actions)
+
+        popup = Popup(
+            title="MQTT settings",
+            content=settings_form,
+            size_hint=(0.92, None),
+            height=dp(500),
+            auto_dismiss=True,
+        )
+        cancel_button.bind(on_release=popup.dismiss)
+
+        def save_settings(*_):
+            broker = fields["broker"].text.strip()
+            topic = fields["topic"].text.strip()
+            username = fields["username"].text.strip()
+            password = fields["password"].text
+            try:
+                port = int(fields["port"].text)
+            except ValueError:
+                error_label.text = "Port must be a number from 1 to 65535"
+                return
+            if not 1 <= port <= 65535:
+                error_label.text = "Port must be a number from 1 to 65535"
+                return
+            if not broker or not topic:
+                error_label.text = "Host and topic are required"
+                return
+            if bool(username) != bool(password):
+                error_label.text = "Enter both username and password, or neither"
+                return
+
+            updated_settings = {
+                "broker": broker,
+                "port": port,
+                "topic": topic,
+                "username": username,
+                "password": password,
+            }
+            try:
+                save_mqtt_settings(self.user_data_dir, updated_settings)
+            except OSError as error:
+                Logger.error("MQTT: could not save settings: %s" % error)
+                error_label.text = "Could not save settings"
+                return
+
+            self.mqtt_settings = updated_settings
+            if hasattr(self, "mqtt_client"):
+                self.mqtt_client.disconnect()
+                self.mqtt_client.loop_stop()
+                self.connect_mqtt()
+            popup.dismiss()
+
+        save_button.bind(on_release=save_settings)
+        self.mqtt_settings_popup = popup
         popup.open()
 
     def on_timer_input_change(self, *_):
