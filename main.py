@@ -76,28 +76,36 @@ class TeamSpinnerOption(SpinnerOption):
         self.height = dp(48)
         self.font_size = "18sp"
         self.halign = "left"
-        self.padding = (dp(40), dp(8))
+        self.padding = (0, 0)
+        self.color = (0, 0, 0, 0)
         with self.canvas.after:
             Color(1, 1, 1, 1)
             self.icon = Rectangle(
                 texture=TEAM_ICONS[TEAM_IDS[self.text]],
-                size=(dp(24), dp(24)),
+                size=(dp(32), dp(32)),
             )
         self.bind(pos=self.update_icon_position, size=self.update_icon_position)
         self.update_icon_position()
 
     def update_icon_position(self, *_):
-        self.icon.pos = (self.x + dp(8), self.y + (self.height - dp(24)) / 2)
+        self.icon.pos = (
+            self.center_x - self.icon.size[0] / 2,
+            self.center_y - self.icon.size[1] / 2,
+        )
 
 
 class TeamSpinner(Spinner):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.halign = "left"
-        self.padding = (dp(40), dp(8))
+        self.halign = "center"
+        self.padding = (0, 0)
+        self.color = (0, 0, 0, 0)
+        self.background_normal = ""
+        self.background_down = ""
+        self.background_color = (0, 0, 0, 0)
         with self.canvas.after:
             Color(1, 1, 1, 1)
-            self.icon = Rectangle(size=(dp(24), dp(24)))
+            self.icon = Rectangle(size=(dp(40), dp(40)))
         self.bind(text=self.update_icon_texture)
         self.update_icon_texture(self, self.text)
         self.bind(pos=self.update_icon_position, size=self.update_icon_position)
@@ -107,7 +115,10 @@ class TeamSpinner(Spinner):
         self.icon.texture = TEAM_ICONS[TEAM_IDS[value]]
 
     def update_icon_position(self, *_):
-        self.icon.pos = (self.x + dp(8), self.y + (self.height - dp(24)) / 2)
+        self.icon.pos = (
+            self.center_x - self.icon.size[0] / 2,
+            self.center_y - self.icon.size[1] / 2,
+        )
 
 
 class OzControllerApp(App):
@@ -125,7 +136,7 @@ class OzControllerApp(App):
             size_hint_y=1,
         )
         self.style_quadrant(top_quadrant, (0.95, 0.97, 0.98, 1))
-        id_text_row = BoxLayout(
+        score_row = BoxLayout(
             orientation="horizontal",
             size_hint_y=None,
             height=dp(54),
@@ -135,25 +146,15 @@ class OzControllerApp(App):
             text="Ajax",
             values=TEAM_OPTIONS,
             option_cls=TeamSpinnerOption,
-            font_size="22sp",
+            font_size="1sp",
             size_hint_x=1,
         )
         self.away_id = TeamSpinner(
             text="Boca",
             values=TEAM_OPTIONS,
             option_cls=TeamSpinnerOption,
-            font_size="22sp",
+            font_size="1sp",
             size_hint_x=1,
-        )
-        id_text_row.add_widget(self.home_id)
-        id_text_row.add_widget(self.away_id)
-        top_quadrant.add_widget(id_text_row)
-
-        first_text_row = BoxLayout(
-            orientation="horizontal",
-            size_hint_y=None,
-            height=dp(54),
-            spacing=dp(8),
         )
         self.home_score = TextInput(
             text="0",
@@ -173,9 +174,11 @@ class OzControllerApp(App):
             halign="center",
             padding=[dp(10), dp(10)],
         )
-        first_text_row.add_widget(self.home_score)
-        first_text_row.add_widget(self.away_score)
-        top_quadrant.add_widget(first_text_row)
+        score_row.add_widget(self.home_id)
+        score_row.add_widget(self.home_score)
+        score_row.add_widget(self.away_score)
+        score_row.add_widget(self.away_id)
+        top_quadrant.add_widget(score_row)
         self.score_buttons_locked = False
         increment_row = self.make_button_row(
             (("+", self.on_button_1), ("+", self.on_button_2))
@@ -183,8 +186,10 @@ class OzControllerApp(App):
         decrement_row = self.make_button_row(
             (("-", self.on_button_3), ("-", self.on_button_4))
         )
+        increment_row.size_hint_y = 1.4
         self.score_buttons = list(reversed(increment_row.children))
         self.score_buttons.extend(reversed(decrement_row.children))
+        decrement_row.size_hint_y = 1.4
         top_quadrant.add_widget(increment_row)
         top_quadrant.add_widget(decrement_row)
         top_quadrant.add_widget(self.make_button_row((("RESET", self.on_button_5),)))
