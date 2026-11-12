@@ -203,7 +203,7 @@ class OzControllerApp(App):
         self.timer_is_set = False
         self.timer_is_running = False
         self.timer_input = TextInput(
-            text="600",
+            text="900",
             input_filter="int",
             multiline=False,
             font_size="22sp",
@@ -214,8 +214,17 @@ class OzControllerApp(App):
         )
         self.timer_input.bind(text=self.on_timer_input_change)
         bottom_quadrant.add_widget(self.timer_input)
-        set_row = self.make_button_row((("SET", self.on_set_timer),))
-        self.set_button = set_row.children[0]
+        set_row = self.make_button_row(
+            (("SET", self.on_set_timer), ("DATE\nTIME", self.on_set_date_time))
+        )
+        self.set_button = next(
+            button for button in set_row.children if button.text == "SET"
+        )
+        self.date_time_button = next(
+            button for button in set_row.children if button.text == "DATE\nTIME"
+        )
+        self.set_button.size_hint_x = 3
+        self.date_time_button.size_hint_x = 1
         bottom_quadrant.add_widget(set_row)
         start_stop_row = self.make_button_row(
             (("START", self.on_start_timer), ("STOP", self.on_stop_timer))
@@ -348,6 +357,7 @@ class OzControllerApp(App):
         action_colors = {
             "RESET": (0.78, 0.14, 0.20, 1),
             "SET": (0.78, 0.14, 0.20, 1),
+            "DATE\nTIME": (1, 0.55, 0, 1),
             "+": (0.13, 0.53, 0.22, 1),
             "START": (0.13, 0.53, 0.22, 1),
             "-": (1, 0.80, 0.10, 1),
@@ -361,9 +371,13 @@ class OzControllerApp(App):
                 button.color = (0.12, 0.12, 0.12, 1)
 
         def fit_label(widget, _value):
-            estimated_text_width = max(len(label) * 0.68, 1)
+            lines = label.splitlines() or [label]
+            estimated_text_width = max(max(map(len, lines)) * 0.68, 1)
+            height_limit = widget.height * 0.55
+            if len(lines) > 1:
+                height_limit = widget.height * 0.9 / len(lines)
             widget.font_size = min(
-                widget.height * 0.55,
+                height_limit,
                 widget.width * 0.9 / estimated_text_width,
             )
 
@@ -488,6 +502,21 @@ class OzControllerApp(App):
             self.publish_mqtt_command("SET", int(self.timer_input.text))
         self.update_timer_controls()
 
+    def on_set_date_time(self, *_):
+        if self.timer_is_running:
+            return
+        self.show_confirmation(
+            "Impostare la durata a 0 significa tornare a data ed ora; vuoi proseguire?",
+            self.confirm_set_date_time,
+        )
+
+    def confirm_set_date_time(self):
+        if self.timer_is_running:
+            return
+        self.timer_is_set = False
+        self.publish_mqtt_command("SET", 0)
+        self.update_timer_controls()
+
     def on_start_timer(self, *_):
         if self.timer_is_set and not self.timer_is_running:
             self.timer_is_running = True
@@ -511,6 +540,7 @@ class OzControllerApp(App):
             button.disabled = not self.timer_is_running or self.score_buttons_locked
         self.set_button.disabled = self.timer_is_running or not self.is_valid_timer_value()
         self.start_button.disabled = self.timer_is_running or not self.timer_is_set
+        self.date_time_button.disabled = self.timer_is_running
         self.stop_button.disabled = not self.timer_is_running
 
 
